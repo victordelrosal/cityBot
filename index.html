@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CityBike NYC — live Citi Bike station finder</title>
+<meta name="description" content="Live NYC Citi Bike availability. Search any station or find the nearest one with a bike or dock free, powered by the public GBFS feed.">
+
+<meta property="og:title" content="CityBike NYC — live Citi Bike station finder">
+<meta property="og:description" content="Live NYC Citi Bike availability, no app, no login. Search a station or find the nearest bike/dock.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+
+<meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='14' y='14' width='72' height='72' rx='18' fill='%231d4d8c'/><rect x='8' y='8' width='84' height='84' rx='22' fill='none' stroke='%23a88742' stroke-width='2' opacity='0.7'/><path d='M28 28 L36 28 M28 28 L28 36' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.85'/><path d='M72 72 L64 72 M72 72 L72 64' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.85'/></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script>
+(() => {
+  try {
+    const saved = localStorage.getItem('citybike-theme');
+    document.documentElement.setAttribute('data-theme', saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'light'));
+  } catch (_) {}
+})();
+</script>
+
+<style>
+  :root, [data-theme="light"] {
+    --bg: #f7f8fa; --bg-deep: #eef1f5;
+    --surface: #ffffff; --surface-alt: #fbfcfd;
+    --hairline: rgba(15,23,42,0.08); --hairline-strong: rgba(15,23,42,0.14);
+    --ink: #0b1220; --ink-2: #2a3142; --ink-3: #5a6273; --ink-4: #8a91a3;
+    --lapis: #1d4d8c; --lapis-deep: #173f73; --lapis-soft: rgba(29,77,140,0.10); --lapis-glow: rgba(29,77,140,0.22);
+    --gold: #a88742;
+    --success: #0e9461; --success-soft: rgba(14,148,97,0.12);
+    --warn: #b8862f; --warn-soft: rgba(184,134,47,0.12);
+    --grid-line: rgba(15,23,42,0.045);
+    --shadow-1: 0 1px 2px rgba(15,23,42,0.04), 0 1px 1px rgba(15,23,42,0.03);
+    --shadow-2: 0 6px 24px rgba(15,23,42,0.06), 0 2px 6px rgba(15,23,42,0.04);
+    --nav-bg: rgba(247,248,250,0.72);
+  }
+  [data-theme="dark"] {
+    --bg: #07090f; --bg-deep: #0a0e18;
+    --surface: #0e131e; --surface-alt: #11172a;
+    --hairline: rgba(255,255,255,0.07); --hairline-strong: rgba(255,255,255,0.14);
+    --ink: #e6e8ee; --ink-2: #b8bccb; --ink-3: #7e8497; --ink-4: #535869;
+    --lapis: #6ea0ec; --lapis-deep: #8eb8f4; --lapis-soft: rgba(110,160,236,0.14); --lapis-glow: rgba(110,160,236,0.40);
+    --gold: #d4b46a;
+    --success: #34d399; --success-soft: rgba(52,211,153,0.16);
+    --warn: #e2c366; --warn-soft: rgba(226,195,102,0.16);
+    --grid-line: rgba(110,160,236,0.05);
+    --shadow-1: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-2: 0 8px 32px rgba(0,0,0,0.5);
+    --nav-bg: rgba(7,9,15,0.72);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 80px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+    font-feature-settings: "kern","liga","calt";
+    position: relative; min-height: 100vh;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, #000 0%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, #000 0%, transparent 80%);
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  .skip-link {
+    position: absolute; left: -9999px; top: auto;
+    background: var(--lapis); color: #fff; padding: 10px 16px; border-radius: 8px; z-index: 200;
+  }
+  .skip-link:focus { left: 16px; top: 16px; }
+
+  a { color: var(--lapis); }
+  :focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; }
+
+  .nav {
+    position: sticky; top: 0; z-index: 100; height: 64px;
+    background: var(--nav-bg); backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; padding: 0 20px; gap: 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--lapis); border: 1.5px solid var(--gold); opacity: 0.95; }
+  .brand small { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); font-weight: 400; }
+  .nav .spacer { flex: 1; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--hairline-strong);
+    background: var(--surface); color: var(--ink-2); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: 160ms ease;
+  }
+  .icon-btn:hover { color: var(--ink); border-color: var(--lapis); background: var(--lapis-soft); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  [data-theme="dark"] .icon-moon, [data-theme="light"] .icon-sun { display: none; }
+
+  main { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; margin: 0 0 10px; }
+  h1 em { color: var(--lapis); font-style: normal; }
+  .lede { color: var(--ink-3); font-size: 17px; max-width: 56ch; margin: 0 0 32px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 12px; }
+  .eyebrow::before { content: "— "; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px;
+    box-shadow: var(--shadow-1); padding: 20px; margin-bottom: 20px; position: relative;
+  }
+  .panel::before, .panel::after {
+    content: ""; position: absolute; width: 10px; height: 10px; border: 1.5px solid var(--lapis); opacity: 0.55;
+  }
+  .panel::before { top: 8px; left: 8px; border-right: none; border-bottom: none; }
+  .panel::after { bottom: 8px; right: 8px; border-left: none; border-top: none; }
+
+  .search-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  input[type="text"] {
+    flex: 1; min-width: 180px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--hairline-strong);
+    background: var(--surface-alt); color: var(--ink); font-size: 15px; font-family: inherit;
+  }
+  input[type="text"]:focus { border-color: var(--lapis); }
+  button.primary, button.secondary {
+    padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 8px; transition: 160ms ease; font-family: inherit;
+  }
+  button.primary { background: var(--lapis); color: #fff; }
+  button.primary:hover { background: var(--lapis-deep); }
+  button.secondary { background: var(--surface); color: var(--ink-2); border-color: var(--hairline-strong); }
+  button.secondary:hover { border-color: var(--lapis); color: var(--ink); }
+  button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .status-line { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--ink-4); margin-top: 10px; }
+  .status-line.err { color: #c0392b; }
+
+  .station-card {
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; box-shadow: var(--shadow-1);
+    padding: 16px 18px; margin-bottom: 12px; position: relative;
+  }
+  .station-card::before, .station-card::after { content: ""; position: absolute; width: 9px; height: 9px; border: 1.5px solid var(--lapis); opacity: 0.5; }
+  .station-card::before { top: 7px; left: 7px; border-right: none; border-bottom: none; }
+  .station-card::after { bottom: 7px; right: 7px; border-left: none; border-top: none; }
+  .station-name { font-weight: 600; font-size: 15px; margin: 0 0 10px; }
+  .station-meta { color: var(--ink-4); font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-left: 8px; font-weight: 400; }
+  .stat-row { display: flex; gap: 22px; flex-wrap: wrap; }
+  .stat { }
+  .stat .num { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-4); }
+  .num.good { color: var(--success); }
+  .num.low { color: var(--warn); }
+  .badge {
+    display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--success-soft); color: var(--success); margin-left: 8px; vertical-align: middle;
+  }
+  .badge.off { background: var(--warn-soft); color: var(--warn); }
+
+  footer { position: relative; z-index: 1; max-width: 760px; margin: 40px auto 0; padding: 20px; border-top: 1px solid var(--hairline); color: var(--ink-4); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .kbd { border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 1px 6px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span>CityBike NYC<small>live Citi Bike GBFS</small></span>
+  </div>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="themeToggle" title="Toggle theme (T)" aria-label="Toggle dark mode">
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+  </button>
+</nav>
+
+<main id="main">
+  <p class="eyebrow">NYC Citi Bike, live</p>
+  <h1>Find a bike, or a <em>dock</em>, right now.</h1>
+  <p class="lede">Pulls straight from Citi Bike's public real-time feed (GBFS), refreshed every 30 seconds. No account, no app.</p>
+
+  <section class="panel" aria-label="Search">
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Search a station, e.g. Grand Army Plaza" aria-label="Search station by name">
+      <button class="primary" id="searchBtn">Search</button>
+      <button class="secondary" id="locBtn">Use my location</button>
+    </div>
+    <div class="status-line" id="statusLine" aria-live="polite">Loading live station data…</div>
+  </section>
+
+  <section id="results" aria-live="polite"></section>
+</main>
+
+<footer>
+  <span class="kbd">T</span> toggle theme · data: Citi Bike GBFS via Cloudflare proxy · built by Victor del Rosal · <span id="today"></span>
+</footer>
+
+<script>
+const PROXY = "https://citybike-gbfs-proxy.victordelrosal.workers.dev";
+let stationInfo = [];
+let stationStatus = new Map();
+let loaded = false;
+
+document.getElementById('today').textContent = new Date().toLocaleDateString('en-IE', { year: 'numeric', month: 'short', day: 'numeric' });
+
+function setStatus(msg, isErr) {
+  const el = document.getElementById('statusLine');
+  el.textContent = msg;
+  el.classList.toggle('err', !!isErr);
+}
+
+async function loadData() {
+  try {
+    const [infoRes, statusRes] = await Promise.all([
+      fetch(PROXY + "/station_information"),
+      fetch(PROXY + "/station_status"),
+    ]);
+    if (!infoRes.ok || !statusRes.ok) throw new Error("feed request failed");
+    const infoJson = await infoRes.json();
+    const statusJson = await statusRes.json();
+    stationInfo = infoJson.data.stations;
+    stationStatus = new Map(statusJson.data.stations.map(s => [s.station_id, s]));
+    loaded = true;
+    setStatus(`Live — ${stationInfo.length.toLocaleString()} stations loaded, refreshes every 30s.`);
+  } catch (e) {
+    setStatus("Could not reach the live feed. Retrying in 30s…", true);
+  }
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function stationCardHtml(info, live, distanceM) {
+  if (!live) return "";
+  const renting = live.is_renting === 1;
+  const bikesClass = live.num_bikes_available > 2 ? "good" : "low";
+  const docksClass = live.num_docks_available > 2 ? "good" : "low";
+  const distText = typeof distanceM === "number" ? `<span class="station-meta">${(distanceM/1000).toFixed(2)} km away</span>` : "";
+  return `
+    <article class="station-card">
+      <p class="station-name">${info.name}${distText}
+        <span class="badge ${renting ? '' : 'off'}">${renting ? 'open' : 'closed'}</span>
+      </p>
+      <div class="stat-row">
+        <div class="stat"><div class="num ${bikesClass}">${live.num_bikes_available}</div><div class="label">bikes</div></div>
+        <div class="stat"><div class="num">${live.num_ebikes_available ?? 0}</div><div class="label">e-bikes</div></div>
+        <div class="stat"><div class="num ${docksClass}">${live.num_docks_available}</div><div class="label">docks</div></div>
+      </div>
+    </article>`;
+}
+
+function renderStations(list) {
+  const el = document.getElementById('results');
+  if (!list.length) { el.innerHTML = `<p class="status-line">No matching stations found.</p>`; return; }
+  el.innerHTML = list.join("");
+}
+
+async function runSearch() {
+  if (!loaded) await loadData();
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!q) { renderStations([]); return; }
+  const matches = stationInfo.filter(s => s.name.toLowerCase().includes(q)).slice(0, 12);
+  renderStations(matches.map(s => stationCardHtml(s, stationStatus.get(s.station_id))).filter(Boolean));
+}
+
+async function useLocation() {
+  if (!navigator.geolocation) { setStatus("Geolocation not supported in this browser.", true); return; }
+  setStatus("Getting your location…");
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    if (!loaded) await loadData();
+    const { latitude: lat, longitude: lon } = pos.coords;
+    const ranked = stationInfo
+      .map(s => ({ s, live: stationStatus.get(s.station_id), d: haversine(lat, lon, s.lat, s.lon) }))
+      .filter(x => x.live && x.live.is_renting === 1)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 8);
+    renderStations(ranked.map(x => stationCardHtml(x.s, x.live, x.d)));
+    setStatus(`Showing the ${ranked.length} nearest live stations to you.`);
+  }, () => setStatus("Location access denied or unavailable.", true));
+}
+
+document.getElementById('searchBtn').addEventListener('click', runSearch);
+document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+document.getElementById('locBtn').addEventListener('click', useLocation);
+
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('citybike-theme', next); } catch(_) {}
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 't' || e.key === 'T') document.getElementById('themeToggle').click();
+}, true);
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
